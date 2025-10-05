@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Person {
+  id           String   @id @default(cuid())
+  recNo        Int      @unique                        // from CSV "Rec #"
+  givenName    String?
+  familyName   String?
+  gender       String?                               // 'M' / 'F' / other
+  dob          DateTime?
+  dod          DateTime?
+  dobHijri     String?
+  dodHijri     String?
+  country      String?
+  education    String?
+  occupation   String?                               // Work
+  buried       String?
+  honour       String?
+  alive        Boolean?
+  notes        String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // graph edges
+  asParent     ParentChild[] @relation("Parent")
+  asChild      ParentChild[] @relation("Child")
+
+  marriagesA   Marriage[]    @relation("A")
+  marriagesB   Marriage[]    @relation("B")
+
+  @@index([familyName, givenName])
+}
+
+model ParentChild {
+  id        String @id @default(cuid())
+  parentId  String
+  childId   String
+
+  parent    Person @relation("Parent", fields: [parentId], references: [id])
+  child     Person @relation("Child",  fields: [childId],  references: [id])
+
+  @@unique([parentId, childId])        // avoid dup edges
+}
+
+model Marriage {
+  id        String   @id @default(cuid())
+  aId       String
+  bId       String
+  start     DateTime?                    // DOM (nikāh) date if known
+  end       DateTime?                    // divorce/death if known
+  nikahType String?                      // optional (e.g., civil, religious)
+  notes     String?
+
+  a         Person   @relation("A", fields: [aId], references: [id])
+  b         Person   @relation("B", fields: [bId], references: [id])
+
+  // multiple concurrent marriages are allowed by design
+  @@index([aId])
+  @@index([bId])
+  @@unique([aId, bId, start])           // same pair, same start only once
+}

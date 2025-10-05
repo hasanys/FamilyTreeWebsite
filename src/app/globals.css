@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Parchment theme */
+:root {
+  --bg: #f7f1e3;               /* warm parchment */
+  --ink: #1f2937;               /* dark ink */
+  --accent: #92400e;            /* sepia accent */
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg) url("https://www.transparenttextures.com/patterns/old-wall.png");
+  color: var(--ink);
+}
+
+/* Reusable bits */
+.navlink {
+  @apply hover:text-[var(--accent)] transition-colors;
+}
+.card {
+  @apply rounded-2xl border border-stone-300/70 bg-white/80 shadow-sm;
+}
+.btn {
+  @apply inline-flex items-center gap-2 rounded-xl border border-stone-400/70 bg-white/80 px-4 py-2 hover:bg-white transition;
+}
+.hero {
+  @apply grid gap-10 md:grid-cols-2 items-center;
+}
+.hero-title {
+  @apply text-4xl md:text-5xl leading-tight;
+}

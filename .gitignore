@@ -1,0 +1,17 @@
+# dependencies & builds
+node_modules/
+.next/
+out/
+dist/
+.vercel/
+
+# env & local
+.env
+.env.local
+.DS_Store
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
