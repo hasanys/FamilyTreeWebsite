@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type Person = { id: string; fullName: string };
 
@@ -28,16 +29,31 @@ export default function SearchPage() {
       />
       {loading && <div className="text-sm text-gray-600">Searching…</div>}
       <ul className="divide-y rounded-xl border bg-white/70">
-        {results.map(p => (
+        {results.map((p) => (
           <li key={p.id} className="p-3 flex items-center justify-between">
-            <span>{p.fullName}</span>
-            <a className="text-blue-700 underline" href={`/tree?focus=${p.id}`}>View tree</a>
+            {/* clickable name → person detail page */}
+            <a
+              href={`/person/${p.id}`}
+              className="text-blue-800 hover:underline text-lg font-medium"
+            >
+              {p.fullName}
+            </a>
+
+            {/* optional tree link on the right */}
+            <a
+              href={`/tree?focus=${p.id}`}
+              className="text-sm text-blue-700 hover:underline"
+            >
+              View tree
+            </a>
           </li>
         ))}
+
         {!loading && results.length === 0 && q && (
           <li className="p-3 text-sm text-gray-600">No matches</li>
         )}
       </ul>
+
     </div>
   );
 }
