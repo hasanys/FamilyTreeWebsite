@@ -5,7 +5,7 @@ export default function Home() {
     <section className="grid gap-10 md:grid-cols-2 items-center">
       <div className="space-y-6">
         <h1 className="font-serif text-4xl md:text-5xl leading-tight">
-          Welcome to our <span className="underline decoration-amber-800/40">Family Archive</span>
+          Welcome to the <span className="underline decoration-amber-800/40">Family Archive</span>
         </h1>
         <p className="text-gray-800/90">
           A living record of our people—names, stories, and branches—preserved for the next generations.
