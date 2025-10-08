@@ -6,14 +6,19 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     // Use raw SQL so we exactly match quoted names in Postgres
-    const rows: Array<{ id: string; givenName: string | null; familyName: string | null }> =
-      await prisma.$queryRawUnsafe(
-        `select "id","givenName","familyName" from "Person" order by "familyName","givenName"`
-      );
+    const rows: Array<{ 
+      id: string; 
+      givenName: string | null; 
+      familyName: string | null;
+      gender: string | null;
+    }> = await prisma.$queryRawUnsafe(
+      `select "id","givenName","familyName","gender" from "Person" order by "familyName","givenName"`
+    );
 
     const shaped = rows.map((p) => ({
       id: p.id,
-      fullName: [p.givenName ?? "", p.familyName ?? ""].join(" ").trim()
+      fullName: [p.givenName ?? "", p.familyName ?? ""].join(" ").trim(),
+      gender: p.gender // Added for tree visualization
     }));
     return NextResponse.json(shaped);
   } catch (e: any) {
