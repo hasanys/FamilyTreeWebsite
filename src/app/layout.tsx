@@ -5,8 +5,8 @@ import { Libre_Baskerville } from "next/font/google";
 const headerSerif = Libre_Baskerville({ weight: ["700"], subsets: ["latin"] });
 
 export const metadata = {
-  title: "Family Archive",
-  description: "Our Family Archive",
+  title: "Family Tree",
+  description: "Our Family Tree",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="sticky top-0 z-10 bg-[var(--bg)]/90 backdrop-blur border-b border-stone-300/60">
           <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-4 text-sm">
             <Link href="/" className={`${headerSerif.className} text-2xl tracking-wide`}>
-              🕰️ Family Archive
+             Family Tree
             </Link>
             <div className="ml-auto flex gap-5">
               <Link className="navlink" href="/search">Search Person</Link>
