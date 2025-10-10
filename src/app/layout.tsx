@@ -21,7 +21,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="ml-auto flex gap-5">
               <Link className="navlink" href="/search">Search Person</Link>
               <Link className="navlink" href="/explore">Explore</Link>
-              <Link className="navlink" href="/tree">Browse Full Tree</Link>
+              <Link className="navlink" href="/kinship">Relations</Link>
+              <Link className="navlink" href="/tree">Browse Tree</Link>
               <Link className="navlink" href="/purpose">Purpose</Link>
               <Link className="navlink" href="/contact">Contact</Link>
               <Link className="navlink" href="/admin">Admin</Link>
