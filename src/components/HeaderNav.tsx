@@ -7,7 +7,15 @@ export default function HeaderNav() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close on ESC or when clicking outside
+  // Disable background scroll while open
+  useEffect(() => {
+    const root = document.documentElement; // or document.body
+    if (open) root.classList.add("overflow-hidden");
+    else root.classList.remove("overflow-hidden");
+    return () => root.classList.remove("overflow-hidden");
+  }, [open]);
+
+  // Close on ESC and when clicking outside
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -50,40 +58,66 @@ export default function HeaderNav() {
       <button
         type="button"
         aria-label="Open menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
-        aria-controls="mobile-nav"
-        onClick={() => setOpen((v) => !v)}
+        aria-controls="mobile-drawer"
+        onClick={() => setOpen(true)}
         className="md:hidden inline-flex items-center justify-center rounded-lg border px-2.5 py-2 text-sm"
       >
         <svg width="20" height="20" viewBox="0 0 24 24">
-          {open ? (
-            <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          ) : (
-            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          )}
+          <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
 
-      {/* Mobile panel */}
+      {/* Fullscreen overlay + right drawer */}
       <div
-        id="mobile-nav"
-        ref={panelRef}
-        className={`md:hidden fixed inset-x-0 top-[56px] z-40 border-b bg-[var(--bg)]/95 backdrop-blur transition-transform ${
-          open ? "translate-y-0" : "-translate-y-[120%]"
-        }`}
+        className={`md:hidden fixed inset-0 z-[60] transition ${open ? "pointer-events-auto" : "pointer-events-none"}`}
+        aria-hidden={!open}
       >
-        <nav className="mx-auto max-w-6xl px-4 py-3 grid gap-2">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="rounded-lg px-3 py-2 text-sm hover:bg-white/60 border"
+        {/* Backdrop */}
+        <div
+          onClick={() => setOpen(false)}
+          className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
+        />
+        {/* Drawer panel */}
+        <div
+          id="mobile-drawer"
+          role="dialog"
+          aria-modal="true"
+          ref={panelRef}
+          className={`absolute right-0 top-0 h-full w-[18rem] max-w-[85vw] bg-[var(--bg)] border-l shadow-xl transition-transform ${
+            open ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          {/* Drawer header */}
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="text-base font-semibold">Menu</div>
+            <button
+              type="button"
+              aria-label="Close menu"
               onClick={() => setOpen(false)}
+              className="rounded-md border p-2"
             >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Drawer links */}
+          <nav className="px-3 py-2">
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setOpen(false)}
+                className="block rounded-lg border px-3 py-2 text-sm hover:bg-white/60 mb-2"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </div>
     </div>
   );

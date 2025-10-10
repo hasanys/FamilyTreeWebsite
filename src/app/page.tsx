@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="mx-auto max-w-7xl px-4 py-12 space-y-12">
+    <main className="mx-auto max-w-7xl px-4 space-y-12">
       {/* HERO */}
       <section className="grid gap-10 md:grid-cols-[1.1fr_1fr] items-center">
         <div className="space-y-6">
