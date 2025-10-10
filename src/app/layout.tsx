@@ -1,6 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { Libre_Baskerville } from "next/font/google";
+import HeaderNav from "@/components/HeaderNav";
 
 const headerSerif = Libre_Baskerville({ weight: ["700"], subsets: ["latin"] });
 
@@ -13,20 +14,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="text-stone-800">
-        <header className="sticky top-0 z-10 bg-[var(--bg)]/90 backdrop-blur border-b border-stone-300/60">
+        <header className="sticky top-0 z-50 bg-[var(--bg)]/90 backdrop-blur border-b border-stone-300/60">
           <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-4 text-sm">
             <Link href="/" className={`${headerSerif.className} text-2xl tracking-wide`}>
-             Family Tree
+              Family Tree
             </Link>
-            <div className="ml-auto flex gap-5">
-              <Link className="navlink" href="/search">Search Person</Link>
-              <Link className="navlink" href="/explore">Explore</Link>
-              <Link className="navlink" href="/kinship">Relations</Link>
-              <Link className="navlink" href="/tree">Browse Tree</Link>
-              <Link className="navlink" href="/purpose">Purpose</Link>
-              <Link className="navlink" href="/contact">Contact</Link>
-              <Link className="navlink" href="/admin">Admin</Link>
-            </div>
+
+            {/* Fills remaining space and contains desktop + mobile menu */}
+            <HeaderNav />
           </nav>
         </header>
 

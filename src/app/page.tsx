@@ -11,33 +11,83 @@ export default function Home() {
             Welcome to our Family Tree
           </h1>
           <p className="text-gray-800/90 text-lg">
-            A living record of our people—names, stories, and branches—preserved for the next generations.
+            A living record of our family, past and present. Names, occupations, and children, preserved for the next generations.
           </p>
 
-          {/* Small reassurance line */}
           <p className="text-sm text-gray-600">
             Read-only for guests. Editors sign in on the Admin page to suggest fixes and add details.
           </p>
         </div>
 
-        {/* Right side: tasteful visual */}
+        {/* Right: calm archival visual */}
         <div className="rounded-2xl border bg-white/70 p-4 shadow-sm">
           <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border">
-            {/* Subtle top gradient */}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-amber-50/40 via-transparent to-transparent" />
             <div
               className="h-full w-full bg-cover bg-center"
               style={{
                 backgroundImage:
-                  // a calmer archival desk/photo vibe (royalty-free Unsplash)
                   "url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop')",
               }}
             />
           </div>
+          <p className="mt-3 text-sm text-gray-600">
+            Quiet fragments—photos, dates, and names—come together to tell a larger story.
+          </p>
         </div>
       </section>
 
-      {/* QUICK LINKS / FEATURE CARDS */}
+
+      {/* PURPOSE (folded from the standalone page) */}
+      <section id="purpose" className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-2xl border bg-white/70 p-6 shadow-sm">
+          <h2 className="text-xl font-semibold">Purpose</h2>
+          <p className="mt-3 text-sm text-gray-800">
+            Families forget fast. Paper fades. Stories get told fewer times each year. This archive keeps names,
+            relationships, and moments in one place so history doesn’t get lost. It gives our ancestors visibility and
+            keeps their branches connected to ours.
+          </p>
+          <p className="mt-3 text-sm text-gray-800">
+            Many of our records live in old <em>shajrah</em> ledgers or scattered notes. We’re converting those into a
+            searchable, accurate database—cleanly modeled, versioned, and easy to explore. Over time, we’ll enrich the
+            tree with dates, places, and photos so every person has context, not just a line on a page.
+          </p>
+          <p className="mt-3 text-sm text-gray-800">
+            This is a long-term effort: careful imports, respectful corrections, and clear sourcing. If you notice an
+            error or can fill a gap, please contribute.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            <Tag>Preservation</Tag>
+            <Tag>Accuracy</Tag>
+            <Tag>Respect</Tag>
+            <Tag>Shared history</Tag>
+          </div>
+        </div>
+
+        {/* How to contribute */}
+        <div className="rounded-2xl border bg-white/70 p-6 shadow-sm">
+          <h3 className="text-lg font-semibold">How to contribute</h3>
+          <ul className="mt-3 space-y-2 text-sm text-gray-800">
+            <li>• Share names, dates, places, or relationships we’re missing.</li>
+            <li>• Upload old photos (with rough dates if you have them).</li>
+            <li>• Flag duplicates or conflicts so we can reconcile them.</li>
+            <li>• Add references—ledger scans, family notes, or public records.</li>
+          </ul>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/contact" className="rounded-xl border bg-white/70 px-4 py-2 shadow-sm hover:bg-white text-sm">
+              Contact
+            </Link>
+            <Link href="/admin" className="rounded-xl border bg-white/70 px-4 py-2 shadow-sm hover:bg-white text-sm">
+              Admin (editors)
+            </Link>
+          </div>
+          <p className="mt-3 text-xs text-gray-600">
+            We review submissions before publishing to protect privacy and maintain lineage accuracy.
+          </p>
+        </div>
+      </section>
+      
+      {/* QUICK LINKS */}
       <section className="grid gap-4 md:grid-cols-3">
         <Card
           title="Search"
@@ -59,44 +109,17 @@ export default function Home() {
         />
       </section>
 
-      {/* HIGHLIGHTS (static teaser to make the page feel fuller) */}
-      <section className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-2xl border bg-white/70 p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">What you can do here</h2>
-          <ul className="mt-3 space-y-2 text-sm text-gray-700">
-            <li>• Jump from a person to their close relatives in one click.</li>
-            <li>• View marriages and children at a glance on each profile.</li>
-            <li>• Explore births by decade and common surnames.</li>
-            <li>• Follow branches visually in the interactive tree.</li>
-          </ul>
-        </div>
-
-        <div className="rounded-2xl border bg-white/70 p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">How to contribute</h2>
-          <p className="mt-3 text-sm text-gray-700">
-            Spot an error or have a story to add? Use the <Link href="/contact" className="text-blue-700 underline">contact form</Link> or,
-            if you’re an editor, head to <Link href="/admin" className="text-blue-700 underline">Admin</Link> to propose updates. 
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <Tag>Names</Tag>
-            <Tag>Dates</Tag>
-            <Tag>Photos</Tag>
-            <Tag>Stories</Tag>
-          </div>
-        </div>
-      </section>
-
-      {/* SUBTLE FOOTER NOTE */}
+      {/* FOOTER NOTE */}
       <section className="rounded-2xl border bg-gradient-to-r from-white/80 to-amber-50/50 p-6 shadow-sm">
         <p className="text-sm text-gray-700">
-          This archive changes as we learn more. Every correction makes the picture clearer—thanks for helping keep our history alive.
+          This archive improves a little whenever someone adds a fact, a date, or a photo. Thanks for helping keep our history alive.
         </p>
       </section>
     </main>
   );
 }
 
-/* ---------- Small presentational bits (inline, no external deps) ---------- */
+/* ---------- Presentational bits ---------- */
 
 function Card({
   title,
@@ -136,7 +159,7 @@ function Tag({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* Simple inline icons (keeps it dependency-free) */
+/* Inline icons */
 function IconSearch() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" className="opacity-80">
