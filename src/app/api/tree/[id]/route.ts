@@ -1,4 +1,3 @@
-// app/api/tree/[id]/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,9 +10,10 @@ type PersonLite = {
   givenName: string | null;
   familyName: string | null;
   gender: string | null;
+  fullName?: string;
 };
 
-function nice(p?: PersonLite | null) {
+function nice(p?: PersonLite | null): PersonLite | null {
   if (!p) return null;
   const full = [p.givenName ?? "", p.familyName ?? ""].join(" ").trim();
   return { ...p, fullName: full || "(unknown)" };
@@ -26,7 +26,7 @@ async function getParents(personId: string) {
       parent: { select: { id: true, givenName: true, familyName: true, gender: true } },
     },
   });
-  return rows.map(r => nice(r.parent));
+  return rows.map((r) => nice(r.parent));
 }
 
 async function getGrandparents(personId: string) {
@@ -37,7 +37,7 @@ async function getGrandparents(personId: string) {
       parents: await getParents(p!.id),
     }))
   );
-  return gp; // [{ parent: <father/mother>, parents: [grandpa, grandma] }, ...]
+  return gp;
 }
 
 async function getSpouses(personId: string) {
@@ -45,14 +45,17 @@ async function getSpouses(personId: string) {
     where: { OR: [{ aId: personId }, { bId: personId }] },
     select: {
       id: true,
-      aId: true, bId: true, start: true, nikahType: true,
+      aId: true,
+      bId: true,
+      start: true,
+      nikahType: true,
       a: { select: { id: true, givenName: true, familyName: true, gender: true } },
       b: { select: { id: true, givenName: true, familyName: true, gender: true } },
     },
     orderBy: [{ start: "asc" }],
   });
 
-  return marriages.map(m => {
+  return marriages.map((m) => {
     const spouse = m.aId === personId ? m.b : m.a;
     return {
       id: m.id,
@@ -64,7 +67,6 @@ async function getSpouses(personId: string) {
 }
 
 async function getChildrenGroupedBySpouse(personId: string) {
-  // children of focus person
   const children = await prisma.parentChild.findMany({
     where: { parentId: personId },
     select: {
@@ -73,45 +75,56 @@ async function getChildrenGroupedBySpouse(personId: string) {
     },
   });
 
-  // find co-parent for each child (might be null/unknown)
-  const withCoParent = await Promise.all(children.map(async (c) => {
-    const others = await prisma.parentChild.findMany({
-      where: { childId: c.childId, NOT: { parentId: personId } },
-      select: { parent: { select: { id: true, givenName: true, familyName: true, gender: true } } },
-    });
-    return {
-      child: nice(c.child),
-      coParent: nice(others[0]?.parent ?? null),
-    };
-  }));
+  const withCoParent = await Promise.all(
+    children.map(async (c) => {
+      const others = await prisma.parentChild.findMany({
+        where: {
+          childId: c.childId,
+          NOT: { parentId: personId },
+        },
+        select: {
+          parent: { select: { id: true, givenName: true, familyName: true, gender: true } },
+        },
+      });
+      return {
+        child: nice(c.child),
+        coParent: nice(others[0]?.parent ?? null),
+      };
+    })
+  );
 
-  // group by coParent.id (or 'unknown')
-  const bySpouse = new Map<string, { spouse: PersonLite | null; children: any[] }>();
+  const bySpouse = new Map<string, { spouse: PersonLite | null; children: PersonLite[] }>();
   for (const row of withCoParent) {
     const key = row.coParent?.id ?? "unknown";
-    if (!bySpouse.has(key)) bySpouse.set(key, { spouse: (row.coParent as any) ?? null, children: [] });
-    bySpouse.get(key)!.children.push(row.child);
+    if (!bySpouse.has(key)) {
+      bySpouse.set(key, { spouse: row.coParent ?? null, children: [] });
+    }
+    bySpouse.get(key)!.children.push(row.child!);
   }
 
-  // fetch grandchildren for each child
-  const result: Array<{ spouse: ReturnType<typeof nice>; children: Array<{ person: any; grandchildren: any[] }> }> = [];
+  const result: Array<{
+    spouse: PersonLite | null;
+    children: Array<{ person: PersonLite; grandchildren: PersonLite[] }>;
+  }> = [];
+
   for (const [, bucket] of bySpouse) {
     const childrenWithGrandkids = await Promise.all(
-      bucket.children.map(async (ch: any) => {
+      bucket.children.map(async (ch) => {
         const gkids = await prisma.parentChild.findMany({
           where: { parentId: ch.id },
-          select: { child: { select: { id: true, givenName: true, familyName: true, gender: true } } },
+          select: {
+            child: { select: { id: true, givenName: true, familyName: true, gender: true } },
+          },
         });
         return {
           person: ch,
-          grandchildren: gkids.map(g => nice(g.child)),
+          grandchildren: gkids.map((g) => nice(g.child)!),
         };
       })
     );
-    result.push({ spouse: bucket.spouse ? nice(bucket.spouse as any) : null, children: childrenWithGrandkids });
+    result.push({ spouse: bucket.spouse ? nice(bucket.spouse) : null, children: childrenWithGrandkids });
   }
 
-  // sort spouses by known vs unknown, then alphabetically
   result.sort((a, b) => {
     const an = a.spouse?.fullName ?? "~";
     const bn = b.spouse?.fullName ?? "~";
@@ -129,7 +142,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       where: { id: params.id },
       select: { id: true, givenName: true, familyName: true, gender: true },
     });
-    if (!person) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!person) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
     const [parents, grandparents, spouses, spouseBuckets] = await Promise.all([
       getParents(person.id),
@@ -138,49 +153,54 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       getChildrenGroupedBySpouse(person.id),
     ]);
 
-    // after you've loaded: person, parents, grandparents, spouses, spouseBuckets
-
-    // helper to detect "male" across different values: "M", "Male", "m", etc.
     const isMale = (g?: string | null) =>
-    (g ?? "").toLowerCase().startsWith("m");
+      (g ?? "").toLowerCase().startsWith("m");
 
-    // pick father from parents (fallback to first parent)
-    const father = parents.find(p => isMale(p?.gender)) ?? parents[0] ?? null;
+    const father = parents.find((p) => isMale(p?.gender)) ?? parents[0] ?? null;
 
-    // pick first son (fallback to first child)
     const firstSon = await prisma.parentChild.findFirst({
-    where: {
+      where: {
         parentId: person.id,
-        child: { gender: { startsWith: "m", mode: "insensitive" } }, // son
-    },
-    select: {
-        child: { select: { id: true, givenName: true, familyName: true, gender: true } },
-    },
-    orderBy: { id: "asc" },
+        child: { gender: { startsWith: "m", mode: "insensitive" } },
+      },
+      select: {
+        child: {
+          select: { id: true, givenName: true, familyName: true, gender: true },
+        },
+      },
+      orderBy: { id: "asc" },
     });
 
     const anyChild = await prisma.parentChild.findFirst({
-    where: { parentId: person.id },
-    select: {
+      where: { parentId: person.id },
+      select: {
         child: { select: { id: true, givenName: true, familyName: true, gender: true } },
-    },
-    orderBy: { id: "asc" },
+      },
+      orderBy: { id: "asc" },
     });
 
     const downTarget = firstSon?.child ?? anyChild?.child ?? null;
 
     return NextResponse.json({
-    focus: nice(person),
-    parents,
-    grandparents,
-    spouses,
-    spouseBuckets,
-    nav: {
-        up: father ? { id: father.id, name: father.fullName } : null,
+      focus: nice(person),
+      parents,
+      grandparents,
+      spouses,
+      spouseBuckets,
+      nav: {
+        up: father
+          ? { id: father.id, name: father.fullName ?? "" }
+          : null,
         down: downTarget
-        ? { id: downTarget.id, name: [downTarget.givenName ?? "", downTarget.familyName ?? ""].join(" ").trim() || "(unknown)" }
-        : null,
-    },
+          ? {
+              id: downTarget.id,
+              name:
+                [downTarget.givenName ?? "", downTarget.familyName ?? ""]
+                  .join(" ")
+                  .trim() || "(unknown)",
+            }
+          : null,
+      },
     });
   } catch (e: any) {
     console.error("GET /api/tree/[id]:", e);
