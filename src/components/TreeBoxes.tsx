@@ -211,18 +211,40 @@ export default function TreeBoxes({ data }: { data: Data }) {
           ))}
         </svg>
 
-        {/* rows */}
-        <Row label="Grandparents">
-          <Pill p={PGF} id={id(PGF, "pgf")} parentIds={[id(father, "father")]} register={register} tone="blue" />
-          <Pill p={PGM} id={id(PGM, "pgm")} parentIds={[id(father, "father")]} register={register} tone="blue" />
-          <Pill p={MGF} id={id(MGF, "mgf")} parentIds={[id(mother, "mother")]} register={register} tone="pink" />
-          <Pill p={MGM} id={id(MGM, "mgm")} parentIds={[id(mother, "mother")]} register={register} tone="pink" />
-        </Row>
+{/* show GRANDPARENTS only if at least one exists */}
+{[PGF, PGM, MGF, MGM].some(Boolean) && (
+  <Row label="Grandparents">
+    {PGF && <Pill p={PGF} id={id(PGF, "pgf")} parentIds={[id(father, "father")]} register={register} tone="blue" />}
+    {PGM && <Pill p={PGM} id={id(PGM, "pgm")} parentIds={[id(father, "father")]} register={register} tone="blue" />}
+    {MGF && <Pill p={MGF} id={id(MGF, "mgf")} parentIds={[id(mother, "mother")]} register={register} tone="pink" />}
+    {MGM && <Pill p={MGM} id={id(MGM, "mgm")} parentIds={[id(mother, "mother")]} register={register} tone="pink" />}
+  </Row>
+)}
 
+        {/* show PARENTS only if at least one exists */}
+        {[father, mother].some(Boolean) && (
         <Row label="Parents">
-          <Pill p={father} id={id(father, "father")} parentIds={[id(focus, "focus")]} register={register} tone="blue" />
-          <Pill p={mother} id={id(mother, "mother")} parentIds={[id(focus, "focus")]} register={register} tone="pink" />
+            {father && (
+            <Pill
+                p={father}
+                id={id(father, "father")}
+                parentIds={[id(focus, "focus")]}
+                register={register}
+                tone="blue"
+            />
+            )}
+            {mother && (
+            <Pill
+                p={mother}
+                id={id(mother, "mother")}
+                parentIds={[id(focus, "focus")]}
+                register={register}
+                tone="pink"
+            />
+            )}
         </Row>
+        )}
+
 
         {/* You + Spouse(s) */}
         <Row label="You">
