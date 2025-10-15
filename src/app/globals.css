@@ -31,3 +31,16 @@ body {
 .hero-title {
   @apply text-4xl md:text-5xl leading-tight;
 }
+
+/* Blur every direct child of <body> EXCEPT the auth modal */
+html.app-locked body > :not(.auth-modal-root) {
+  filter: blur(9px);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Never blur the modal itself */
+html.app-locked .auth-modal-root {
+  filter: none;
+  pointer-events: auto;
+}

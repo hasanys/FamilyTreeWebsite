@@ -7,15 +7,30 @@ export default function HeaderNav() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  const [authed, setAuthed] = useState(false);
+
+  // Detect auth from localStorage / cookie
+  useEffect(() => {
+    const checkAuth = () => {
+      const ls = typeof window !== "undefined" && localStorage.getItem("ft_auth") === "1";
+      const ck = typeof document !== "undefined" && document.cookie.includes("ft_auth=1");
+      setAuthed(ls || ck);
+    };
+    checkAuth();
+    // re-check when storage changes (manual reloads)
+    window.addEventListener("storage", checkAuth);
+    return () => window.removeEventListener("storage", checkAuth);
+  }, []);
+
   // Disable background scroll while open
   useEffect(() => {
-    const root = document.documentElement; // or document.body
+    const root = document.documentElement;
     if (open) root.classList.add("overflow-hidden");
     else root.classList.remove("overflow-hidden");
     return () => root.classList.remove("overflow-hidden");
   }, [open]);
 
-  // Close on ESC and when clicking outside
+  // Close on ESC and outside click
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -43,15 +58,46 @@ export default function HeaderNav() {
     { href: "/admin", label: "Admin" },
   ];
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    localStorage.removeItem("ft_auth");
+    setAuthed(false);
+    location.reload();
+  }
+
+  async function handleLoginClick() {
+    // Only used on Home/Contact, triggers password modal manually
+    localStorage.removeItem("ft_auth");
+    document.cookie = "ft_auth=; Path=/; Max-Age=0;";
+    location.href = "/tree"; // any protected route will trigger modal
+  }
+
   return (
     <div className="ml-auto flex items-center">
       {/* Desktop links */}
-      <div className="hidden md:flex gap-5">
+      <div className="hidden md:flex gap-5 items-center">
         {links.map((l) => (
           <Link key={l.href} className="navlink" href={l.href}>
             {l.label}
           </Link>
         ))}
+
+        {/* ✅ Login / Logout button */}
+        {!authed ? (
+          <button
+            onClick={handleLoginClick}
+            className="ml-3 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
+          >
+            Login
+          </button>
+        ) : (
+          <button
+            onClick={handleLogout}
+            className="ml-3 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
+          >
+            Logout
+          </button>
+        )}
       </div>
 
       {/* Mobile hamburger */}
@@ -65,19 +111,28 @@ export default function HeaderNav() {
         className="md:hidden inline-flex items-center justify-center rounded-lg border px-2.5 py-2 text-sm"
       >
         <svg width="20" height="20" viewBox="0 0 24 24">
-          <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M3 6h18M3 12h18M3 18h18"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </svg>
       </button>
 
       {/* Fullscreen overlay + right drawer */}
       <div
-        className={`md:hidden fixed inset-0 z-[60] transition ${open ? "pointer-events-auto" : "pointer-events-none"}`}
+        className={`md:hidden fixed inset-0 z-[60] transition ${
+          open ? "pointer-events-auto" : "pointer-events-none"
+        }`}
         aria-hidden={!open}
       >
         {/* Backdrop */}
         <div
           onClick={() => setOpen(false)}
-          className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${
+            open ? "opacity-100" : "opacity-0"
+          }`}
         />
         {/* Drawer panel */}
         <div
@@ -99,7 +154,12 @@ export default function HeaderNav() {
               className="rounded-md border p-2"
             >
               <svg width="20" height="20" viewBox="0 0 24 24">
-                <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path
+                  d="M6 6l12 12M6 18L18 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -116,6 +176,29 @@ export default function HeaderNav() {
                 {l.label}
               </Link>
             ))}
+
+            {/* ✅ Mobile Login/Logout */}
+            {!authed ? (
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  handleLoginClick();
+                }}
+                className="mt-4 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+              >
+                Login
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  handleLogout();
+                }}
+                className="mt-4 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+              >
+                Logout
+              </button>
+            )}
           </nav>
         </div>
       </div>
