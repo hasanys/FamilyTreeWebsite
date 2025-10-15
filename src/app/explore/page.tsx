@@ -128,8 +128,6 @@ export default async function ExplorePage() {
           <ValueCardClient label="DoD before DoB"     endpoint="/api/explore/anomalies"       path="map.dod_before_dob" />
           <ValueCardClient label="DOB in future"      endpoint="/api/explore/anomalies"       path="map.dob_in_future" />
           <ValueCardClient label="Missing name"       endpoint="/api/explore/anomalies"       path="map.missing_name" />
-          <ValueCardClient label="DOB (Hijri) present" endpoint="/api/explore/hijri-coverage" path="map.dob_hijri" />
-          <ValueCardClient label="DOD (Hijri) present" endpoint="/api/explore/hijri-coverage" path="map.dod_hijri" />
         </div>
       </section>
     </main>

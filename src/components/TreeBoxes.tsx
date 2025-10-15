@@ -4,42 +4,61 @@ import Link from "next/link";
 import React from "react";
 import clsx from "clsx";
 
-type Person = { id: string; fullName: string | null; gender?: string | null };
+type Person = { id: string; fullName: string; gender?: string | null };
+type ChildBucket = {
+  person: Person;
+  grandchildren: Person[];
+};
+type SpouseBucket = {
+  spouse: Person | null;
+  children: ChildBucket[];
+};
 
 type Data = {
   focus: Person;
   parents: (Person | null)[];
   grandparents: Array<{ parent: Person | null; parents: (Person | null)[] }>;
-  spouseBuckets: Array<{
-    spouse: Person | null;
-    children: Array<{ person: Person; grandchildren: Person[] }>;
-  }>;
-  nav: { up: Person | null; down: Person | null };
+  /** All spouses of the focus person (includes spouses without shared children) */
+  spouses?: Person[];
+  /** Buckets used to group children by (known) spouse */
+  spouseBuckets: SpouseBucket[];
+  nav: { up: { id: string; name: string } | null; down: { id: string; name: string } | null };
 };
 
-/* ---------- helpers ---------- */
+/* Helpers */
 function splitParents(parents: (Person | null)[]) {
   let father: Person | null = null;
   let mother: Person | null = null;
   for (const p of parents) {
     if (!p) continue;
-    const g = (p.gender || "").toLowerCase();
-    if (!father && g.startsWith("m")) father = p; else if (!mother && g.startsWith("f")) mother = p;
+    const g = (p.gender ?? "").toLowerCase();
+    if (!father && g.startsWith("m")) father = p;
+    else if (!mother && g.startsWith("f")) mother = p;
   }
   if (!father) father = parents[0] ?? null;
   if (!mother) mother = parents[1] ?? null;
   return { father, mother };
 }
-function uniq<T extends { id?: string | number }>(xs: T[]) {
-  const seen = new Set<string | number>(), out: T[] = [];
+
+function uniq<T extends { id?: string | number | null }>(xs: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
   for (const x of xs) {
-    const k = x?.id ?? Symbol();
-    if (!seen.has(k as any)) { seen.add(k as any); out.push(x); }
+    const raw = x?.id;
+    if (raw === undefined || raw === null) {
+      out.push(x);
+      continue;
+    }
+    const k = String(raw);
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(x);
+    }
   }
   return out;
 }
 
-/* ---------- Pill ---------- */
+/* Pill component */
 type Tone = "blue" | "pink" | "amber" | "green" | "slate" | "violet";
 const toneAccent: Record<Tone, string> = {
   blue: "from-blue-400 to-blue-600",
@@ -51,37 +70,55 @@ const toneAccent: Record<Tone, string> = {
 };
 
 function Pill({
-  p, id, parentIds, register, tone = "slate", size = "md",
+  p,
+  id,
+  parentIds,
+  register,
+  tone = "slate",
+  size = "md",
+  isFocus = false,
 }: {
   p: Person | null;
   id: string;
-  parentIds?: string[];               // ← support multiple parents
+  parentIds?: string[];
   register: (id: string, el: HTMLDivElement | null) => void;
   tone?: Tone;
   size?: "sm" | "md" | "lg";
+  /** visual emphasis for the "You" pill */
+  isFocus?: boolean;
 }) {
   const sizeCls =
-    size === "sm" ? "px-3 py-1.5 text-[13px]" :
-    size === "lg" ? "px-4 py-2.5 text-[15px]" :
-                    "px-4 py-2 text-[14px]";
+    size === "sm"
+      ? "px-3 py-1.5 text-[13px]"
+      : size === "lg"
+      ? "px-4 py-2.5 text-[15px]"
+      : "px-4 py-2 text-[14px]";
+
   return (
     <div
       ref={(el) => register(id, el)}
       data-id={id}
-      data-parent-ids={(parentIds ?? []).join(",")}   // ← comma-separated
+      data-parent-ids={(parentIds ?? []).join(",")}
       className={clsx(
         "relative inline-flex items-center rounded-2xl border bg-white text-gray-900 shadow-sm",
         "border-gray-200 hover:shadow-md transition-shadow",
-        sizeCls
+        sizeCls,
+        isFocus && "font-semibold border-2 border-amber-400 ring-2 ring-amber-300 shadow-md"
       )}
       title={p?.fullName ?? ""}
     >
-      <span className={clsx(
-        "absolute -left-1 top-1.5 bottom-1.5 w-1.5 rounded-full",
-        "bg-gradient-to-b", toneAccent[tone]
-      )}/>
+      <span
+        className={clsx(
+          "absolute -left-1 top-1.5 bottom-1.5 rounded-full",
+          isFocus ? "w-4" : "w-1.5",
+          "bg-gradient-to-b",
+          toneAccent[tone]
+        )}
+      />
       {p ? (
-        <Link href={`/tree?id=${p.id}`} className="no-underline text-inherit">{p.fullName}</Link>
+        <Link href={`/tree?id=${p.id}`} className="no-underline text-inherit">
+          {p.fullName}
+        </Link>
       ) : (
         <span className="text-gray-400">—</span>
       )}
@@ -89,28 +126,43 @@ function Pill({
   );
 }
 
-/* ---------- Main ---------- */
+/* Row wrapper */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[180px_1fr] items-start gap-x-4 py-8">
+      <div className="justify-self-start text-xs font-semibold uppercase tracking-wider text-gray-500">
+        {label}
+      </div>
+     <div className="flex flex-wrap items-start justify-center gap-6 translate-x-[-40px]">{children}</div>
+    </div>
+  );
+}
+
+/* Main component */
 export default function TreeBoxes({ data }: { data: Data }) {
-  const { focus } = data;
-  const { father, mother } = splitParents(data.parents ?? []);
+  const { focus, parents, grandparents, spouseBuckets, spouses: apiSpouses = [], nav } = data;
+  const { father, mother } = splitParents(parents);
 
-  const pat = data.grandparents.find((g) => g.parent?.id === father?.id) ?? { parent: null, parents: [] };
-  const mat = data.grandparents.find((g) => g.parent?.id === mother?.id) ?? { parent: null, parents: [] };
-  const [PGF, PGM] = [pat.parents?.[0] ?? null, pat.parents?.[1] ?? null];
-  const [MGF, MGM] = [mat.parents?.[0] ?? null, mat.parents?.[1] ?? null];
+  const [PGF, PGM] = grandparents.find((g) => g.parent?.id === father?.id)?.parents ?? [null, null];
+  const [MGF, MGM] = grandparents.find((g) => g.parent?.id === mother?.id)?.parents ?? [null, null];
 
-  // spouse list (unique, non-null)
+  // Show all spouses returned by the API (includes spouses without shared children).
+  // Fallback to spouseBuckets for backward compatibility.
   const spouses = uniq(
-    data.spouseBuckets.map((b) => b.spouse).filter((s): s is Person => !!s)
+    (apiSpouses?.length
+      ? apiSpouses
+      : spouseBuckets.map((b) => b.spouse).filter((s): s is Person => !!s)) as Person[]
   );
 
-  // ---------------- connectors (parent bottom -> child top; supports multiple parents) ----------------
   const nodesRef = React.useRef(new Map<string, HTMLDivElement>());
-  const [lines, setLines] = React.useState<Array<{ x1:number;y1:number;x2:number;y2:number }>>([]);
+  const [lines, setLines] = React.useState<
+    { x1: number; y1: number; x2: number; y2: number }[]
+  >([]);
 
   const register = (key: string, el: HTMLDivElement | null) => {
     const m = nodesRef.current;
-    if (el) m.set(key, el); else m.delete(key);
+    if (el) m.set(key, el);
+    else m.delete(key);
   };
 
   React.useEffect(() => {
@@ -132,9 +184,8 @@ export default function TreeBoxes({ data }: { data: Data }) {
       };
 
       const PAD = 10;
-      const segs: Array<{ x1:number;y1:number;x2:number;y2:number }> = [];
+      const segs: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
 
-      // For each node, draw to *each* parent in data-parent-ids
       m.forEach((el) => {
         const parentIds = (el.getAttribute("data-parent-ids") ?? "")
           .split(",")
@@ -152,9 +203,14 @@ export default function TreeBoxes({ data }: { data: Data }) {
           const yParentBottom = p.bottom + PAD;
           const midY = (yChildTop + yParentBottom) / 2;
 
-          segs.push({ x1:c.cx, y1:yChildTop, x2:c.cx, y2:midY });
-          segs.push({ x1:Math.min(c.cx,p.cx), y1:midY, x2:Math.max(c.cx,p.cx), y2:midY });
-          segs.push({ x1:p.cx, y1:midY, x2:p.cx, y2:yParentBottom });
+          segs.push({ x1: c.cx, y1: yChildTop, x2: c.cx, y2: midY });
+          segs.push({
+            x1: Math.min(c.cx, p.cx),
+            y1: midY,
+            x2: Math.max(c.cx, p.cx),
+            y2: midY,
+          });
+          segs.push({ x1: p.cx, y1: midY, x2: p.cx, y2: yParentBottom });
         }
       });
 
@@ -166,7 +222,7 @@ export default function TreeBoxes({ data }: { data: Data }) {
       frame = requestAnimationFrame(computeLines);
     };
 
-    recompute(); // initial
+    recompute();
 
     const ro = new ResizeObserver(recompute);
     const container = document.getElementById("tree-canvas-tw");
@@ -174,7 +230,6 @@ export default function TreeBoxes({ data }: { data: Data }) {
 
     window.addEventListener("resize", recompute);
 
-    // Recompute on DOM changes (children / grandchildren mount)
     const mo = new MutationObserver(recompute);
     if (container) mo.observe(container, { childList: true, subtree: true });
 
@@ -184,178 +239,196 @@ export default function TreeBoxes({ data }: { data: Data }) {
       mo.disconnect();
       window.removeEventListener("resize", recompute);
     };
-  }, []);
+  }, [data]);
 
-  const id = (p: Person | null, fb: string) => (p?.id ?? fb);
+  const idFor = (p: Person | null, fallback: string) => p?.id ?? fallback;
 
   return (
     <div className="grid gap-10">
-      {/* Up button */}
       <div className="flex justify-center">
         <a
           className={clsx(
             "rounded-2xl border border-gray-200 bg-white px-4 py-2 font-semibold shadow-sm",
-            !data.nav?.up && "pointer-events-none opacity-40"
+            !nav.up && "pointer-events-none opacity-40"
           )}
-          href={data.nav?.up ? `/tree?id=${data.nav.up.id}` : "#"}
+          href={nav.up ? `/tree?id=${nav.up.id}` : "#"}
         >
           ↑ Up one generation
         </a>
       </div>
 
       <div id="tree-canvas-tw" className="relative">
-        {/* connectors */}
         <svg className="pointer-events-none absolute inset-0 -z-10" width="100%" height="100%">
           {lines.map((l, i) => (
-            <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className="stroke-slate-300" strokeWidth="2" />
+            <line
+              key={i}
+              x1={l.x1}
+              y1={l.y1}
+              x2={l.x2}
+              y2={l.y2}
+              className="stroke-slate-300"
+              strokeWidth="2"
+            />
           ))}
         </svg>
 
-{/* show GRANDPARENTS only if at least one exists */}
-{[PGF, PGM, MGF, MGM].some(Boolean) && (
-  <Row label="Grandparents">
-    {PGF && <Pill p={PGF} id={id(PGF, "pgf")} parentIds={[id(father, "father")]} register={register} tone="blue" />}
-    {PGM && <Pill p={PGM} id={id(PGM, "pgm")} parentIds={[id(father, "father")]} register={register} tone="blue" />}
-    {MGF && <Pill p={MGF} id={id(MGF, "mgf")} parentIds={[id(mother, "mother")]} register={register} tone="pink" />}
-    {MGM && <Pill p={MGM} id={id(MGM, "mgm")} parentIds={[id(mother, "mother")]} register={register} tone="pink" />}
-  </Row>
-)}
-
-        {/* show PARENTS only if at least one exists */}
-        {[father, mother].some(Boolean) && (
-        <Row label="Parents">
-            {father && (
-            <Pill
-                p={father}
-                id={id(father, "father")}
-                parentIds={[id(focus, "focus")]}
+        {[PGF, PGM, MGF, MGM].some(Boolean) && (
+          <Row label="Grandparents">
+            {PGF && (
+              <Pill
+                p={PGF}
+                id={idFor(PGF, "pgf")}
+                parentIds={[idFor(father, "father")]}
                 register={register}
                 tone="blue"
-            />
+              />
             )}
-            {mother && (
-            <Pill
-                p={mother}
-                id={id(mother, "mother")}
-                parentIds={[id(focus, "focus")]}
+            {PGM && (
+              <Pill
+                p={PGM}
+                id={idFor(PGM, "pgm")}
+                parentIds={[idFor(father, "father")]}
+                register={register}
+                tone="blue"
+              />
+            )}
+            {MGF && (
+              <Pill
+                p={MGF}
+                id={idFor(MGF, "mgf")}
+                parentIds={[idFor(mother, "mother")]}
                 register={register}
                 tone="pink"
-            />
+              />
             )}
-        </Row>
+            {MGM && (
+              <Pill
+                p={MGM}
+                id={idFor(MGM, "mgm")}
+                parentIds={[idFor(mother, "mother")]}
+                register={register}
+                tone="pink"
+              />
+            )}
+          </Row>
         )}
 
+        {[father, mother].some(Boolean) && (
+          <Row label="Parents">
+            {father && (
+              <Pill
+                p={father}
+                id={idFor(father, "father")}
+                parentIds={[idFor(focus, "focus")]}
+                register={register}
+                tone="blue"
+              />
+            )}
+            {mother && (
+              <Pill
+                p={mother}
+                id={idFor(mother, "mother")}
+                parentIds={[idFor(focus, "focus")]}
+                register={register}
+                tone="pink"
+              />
+            )}
+          </Row>
+        )}
 
-        {/* You + Spouse(s) */}
-        <Row label="You">
-          <Pill p={focus} id={id(focus, "focus")} register={register} tone="amber" size="lg" />
+        <Row label="You + Spouses">
+          <Pill
+            p={focus}
+            id={idFor(focus, "focus")}
+            register={register}
+            tone="amber"
+            size="lg"
+            isFocus
+          />
           {spouses.map((s) => (
             <Pill key={s.id} p={s} id={s.id} register={register} tone="violet" />
           ))}
         </Row>
 
- {/* Children (grouped by spouse, and inside each, grouped per child) */}
-<Row label="Children">
-  {data.spouseBuckets.map((bucket, idx) => {
-    const spouse = bucket.spouse ?? null;
-    const parentIds = spouse ? [id(focus, "focus"), spouse.id] : [id(focus, "focus")];
+        <Row label="Children">
+          {spouseBuckets.map((bucket, idx) => {
+            const spouse = bucket.spouse;
+            const parentIds = spouse ? [idFor(focus, "focus"), spouse.id] : [idFor(focus, "focus")];
 
-    return (
-      <div
-        key={spouse?.id ?? `unknown-${idx}`}
-        className="flex min-w-[220px] flex-col items-center gap-3"
-      >
-        {spouse ? (
-          <div className="text-[12px] font-medium text-gray-500">
-            With {spouse.fullName}
-          </div>
-        ) : (
-          <div className="text-[12px] font-medium text-gray-400">Spouse unknown</div>
-        )}
-
-        {/* grid of child groups for this spouse */}
-        <div className="flex flex-wrap items-start justify-center gap-4">
-          {bucket.children.length ? (
-            bucket.children.map((ch) => (
+            return (
               <div
-                key={ch.person.id}
-                className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3"
+                key={spouse?.id ?? `unknown-${idx}`}
+                className="flex min-w-[220px] flex-col items-center gap-3"
               >
-                {/* child pill (connects to BOTH parents) */}
-                <div className="flex justify-center mb-2">
-                  <Pill
-                    p={ch.person}
-                    id={ch.person.id}
-                    parentIds={parentIds}
-                    register={register}
-                    tone="green"
-                  />
-                </div>
+                {spouse ? (
+                  <div className="text-[12px] font-medium text-gray-500">With {spouse.fullName}</div>
+                ) : (
+                  <div className="text-[12px] font-medium text-gray-400">Spouse unknown</div>
+                )}
 
-                {/* little header so it reads clearly */}
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 text-center">
-                  Children of {ch.person.fullName}
-                </div>
-
-                {/* grandchildren of this child */}
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {ch.grandchildren.length ? (
-                    ch.grandchildren.map((g) => (
-                      <Pill
-                        key={g.id}
-                        p={g}
-                        id={g.id}
-                        parentIds={[ch.person.id]}  // connect to the child
-                        register={register}
-                        tone="slate"
-                        size="sm"
-                      />
+                <div className="flex flex-wrap items-start justify-center gap-4">
+                  {bucket.children.length ? (
+                    bucket.children.map((ch) => (
+                      <div
+                        key={ch.person.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3"
+                      >
+                        <div className="mb-2 flex justify-center">
+                          <Pill
+                            p={ch.person}
+                            id={ch.person.id}
+                            parentIds={parentIds}
+                            register={register}
+                            tone="green"
+                          />
+                        </div>
+                        <div className="mb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Children of {ch.person.fullName}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          {ch.grandchildren.length ? (
+                            ch.grandchildren.map((g) => (
+                              <Pill
+                                key={g.id}
+                                p={g}
+                                id={g.id}
+                                parentIds={[ch.person.id]}
+                                register={register}
+                                tone="slate"
+                                size="sm"
+                              />
+                            ))
+                          ) : (
+                            <span className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-[11px] text-gray-600">
+                              No grandchildren
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     ))
                   ) : (
-                    <span className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-[11px] text-gray-600">
-                      No grandchildren
+                    <span className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs text-gray-600">
+                      No children
                     </span>
                   )}
                 </div>
               </div>
-            ))
-          ) : (
-            <span className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs text-gray-600">
-              No children
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  })}
-</Row>
-
+            );
+          })}
+        </Row>
       </div>
 
-      {/* Down button */}
       <div className="flex justify-center">
         <a
           className={clsx(
             "rounded-2xl border border-gray-200 bg-white px-4 py-2 font-semibold shadow-sm",
-            !data.nav?.down && "pointer-events-none opacity-40"
+            !nav.down && "pointer-events-none opacity-40"
           )}
-          href={data.nav?.down ? `/tree?id=${data.nav.down.id}` : "#"}
+          href={nav.down ? `/tree?id=${nav.down.id}` : "#"}
         >
           ↓ Down one generation
         </a>
       </div>
-    </div>
-  );
-}
-
-/* Row */
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[140px_1fr] items-start gap-x-4 py-8">
-      <div className="justify-self-start text-xs font-semibold uppercase tracking-wider text-gray-500">
-        {label}
-      </div>
-      <div className="flex flex-wrap items-start justify-center gap-6">{children}</div>
     </div>
   );
 }

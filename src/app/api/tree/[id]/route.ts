@@ -1,25 +1,40 @@
+// app/api/tree/[id]/route.ts
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 30; // short cache; adjust if needed
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type PersonLite = {
+/* ---------- Types ---------- */
+type BasePerson = {
   id: string;
   givenName: string | null;
   familyName: string | null;
   gender: string | null;
-  fullName?: string;
 };
 
-function nice(p?: PersonLite | null): PersonLite | null {
-  if (!p) return null;
-  const full = [p.givenName ?? "", p.familyName ?? ""].join(" ").trim();
-  return { ...p, fullName: full || "(unknown)" };
+type PersonLite = BasePerson & {
+  fullName: string;
+};
+
+/* ---------- Helpers ---------- */
+function toFullName(given: string | null, family: string | null) {
+  const s = [given ?? "", family ?? ""].join(" ").trim();
+  return s || "(unknown)";
 }
 
-async function getParents(personId: string) {
+function nice(p: BasePerson | null | undefined): PersonLite | null {
+  if (!p) return null;
+  return {
+    ...p,
+    fullName: toFullName(p.givenName, p.familyName),
+  };
+}
+
+const isMale = (g?: string | null) => (g ?? "").toLowerCase().startsWith("m");
+
+/* ---------- Data fetch helpers ---------- */
+async function getParents(personId: string): Promise<(PersonLite | null)[]> {
   const rows = await prisma.parentChild.findMany({
     where: { childId: personId },
     select: {
@@ -34,172 +49,179 @@ async function getGrandparents(personId: string) {
   const gp = await Promise.all(
     parents.map(async (p) => ({
       parent: p,
-      parents: await getParents(p!.id),
+      parents: p ? await getParents(p.id) : [],
     }))
   );
+  // [{ parent: <father/mother>, parents: [grandpa, grandma] }, ...]
   return gp;
 }
 
-async function getSpouses(personId: string) {
+/**
+ * Return ALL spouses of the person as flat PersonLite objects.
+ * - Uses aId/bId with relations a/b from your schema.
+ * - Orders by marriage start ascending.
+ * - De-duplicates by spouse.id while preserving order.
+ */
+async function getSpouses(personId: string): Promise<PersonLite[]> {
   const marriages = await prisma.marriage.findMany({
     where: { OR: [{ aId: personId }, { bId: personId }] },
     select: {
-      id: true,
       aId: true,
       bId: true,
       start: true,
-      nikahType: true,
       a: { select: { id: true, givenName: true, familyName: true, gender: true } },
       b: { select: { id: true, givenName: true, familyName: true, gender: true } },
     },
     orderBy: [{ start: "asc" }],
   });
 
-  return marriages.map((m) => {
-    const spouse = m.aId === personId ? m.b : m.a;
-    return {
-      id: m.id,
-      start: m.start,
-      nikahType: m.nikahType ?? null,
-      spouse: nice(spouse),
-    };
+  // map to the other party in each marriage
+  const raw = marriages.map((m) => (m.aId === personId ? m.b : m.a));
+  const list = raw.map((p) => nice(p)).filter(Boolean) as PersonLite[];
+
+  // de-dupe by spouse id (preserve first occurrence = earliest marriage)
+  const seen = new Set<string>();
+  return list.filter((s) => {
+    if (seen.has(s.id)) return false;
+    seen.add(s.id);
+    return true;
   });
 }
 
+/**
+ * Children grouped by co-parent (spouse) — batched (no N+1):
+ * - Fetch all children of focus
+ * - Fetch all co-parent links for those children in one query
+ * - Fetch all grandchildren for those children in one query
+ */
 async function getChildrenGroupedBySpouse(personId: string) {
-  const children = await prisma.parentChild.findMany({
+  // 1) children of focus (one query)
+  const childrenLinks = await prisma.parentChild.findMany({
     where: { parentId: personId },
     select: {
-      child: { select: { id: true, givenName: true, familyName: true, gender: true } },
       childId: true,
+      child: { select: { id: true, givenName: true, familyName: true, gender: true } },
+    },
+    orderBy: { childId: "asc" },
+  });
+
+  const childIds = childrenLinks.map((c) => c.childId);
+  if (childIds.length === 0) return [] as Array<{
+    spouse: PersonLite | null;
+    children: Array<{ person: PersonLite; grandchildren: PersonLite[] }>;
+  }>;
+
+  // 2) co-parents for all those children (one query)
+  const coParentLinks = await prisma.parentChild.findMany({
+    where: {
+      childId: { in: childIds },
+      NOT: { parentId: personId },
+    },
+    select: {
+      childId: true,
+      parent: { select: { id: true, givenName: true, familyName: true, gender: true } },
     },
   });
 
-  const withCoParent = await Promise.all(
-    children.map(async (c) => {
-      const others = await prisma.parentChild.findMany({
-        where: {
-          childId: c.childId,
-          NOT: { parentId: personId },
-        },
-        select: {
-          parent: { select: { id: true, givenName: true, familyName: true, gender: true } },
-        },
-      });
-      return {
-        child: nice(c.child),
-        coParent: nice(others[0]?.parent ?? null),
-      };
-    })
-  );
-
-  const bySpouse = new Map<string, { spouse: PersonLite | null; children: PersonLite[] }>();
-  for (const row of withCoParent) {
-    const key = row.coParent?.id ?? "unknown";
-    if (!bySpouse.has(key)) {
-      bySpouse.set(key, { spouse: row.coParent ?? null, children: [] });
+  // Map childId -> (first) co-parent
+  const coParentByChildId = new Map<string, BasePerson | null>();
+  for (const c of childrenLinks) coParentByChildId.set(c.childId, null); // default
+  for (const link of coParentLinks) {
+    if (!coParentByChildId.get(link.childId)) {
+      coParentByChildId.set(link.childId, link.parent as BasePerson);
     }
-    bySpouse.get(key)!.children.push(row.child!);
   }
 
-  const result: Array<{
+  // 3) grandchildren for ALL those children in one query
+  const gkidLinks = await prisma.parentChild.findMany({
+    where: { parentId: { in: childIds } },
+    select: {
+      parentId: true,
+      child: { select: { id: true, givenName: true, familyName: true, gender: true } },
+    },
+    orderBy: { parentId: "asc" },
+  });
+
+  const gkidsByParentId = new Map<string, PersonLite[]>();
+  for (const id of childIds) gkidsByParentId.set(id, []);
+  for (const row of gkidLinks) {
+    const list = gkidsByParentId.get(row.parentId)!;
+    list.push(nice(row.child)!);
+  }
+
+  // 4) bucket children by co-parent
+  type Bucket = {
     spouse: PersonLite | null;
     children: Array<{ person: PersonLite; grandchildren: PersonLite[] }>;
-  }> = [];
+  };
+  const bucketsMap = new Map<string, Bucket>();
 
-  for (const [, bucket] of bySpouse) {
-    const childrenWithGrandkids = await Promise.all(
-      bucket.children.map(async (ch) => {
-        const gkids = await prisma.parentChild.findMany({
-          where: { parentId: ch.id },
-          select: {
-            child: { select: { id: true, givenName: true, familyName: true, gender: true } },
-          },
-        });
-        return {
-          person: ch,
-          grandchildren: gkids.map((g) => nice(g.child)!),
-        };
-      })
-    );
-    result.push({ spouse: bucket.spouse ? nice(bucket.spouse) : null, children: childrenWithGrandkids });
+  for (const row of childrenLinks) {
+    const childLite = nice(row.child)!;
+    const co = coParentByChildId.get(row.childId) || null;
+    const key = co?.id ?? "unknown";
+
+    if (!bucketsMap.has(key)) {
+      bucketsMap.set(key, { spouse: nice(co), children: [] });
+    }
+    bucketsMap.get(key)!.children.push({
+      person: childLite,
+      grandchildren: gkidsByParentId.get(row.childId) || [],
+    });
   }
 
-  result.sort((a, b) => {
-    const an = a.spouse?.fullName ?? "~";
-    const bn = b.spouse?.fullName ?? "~";
+  const buckets = Array.from(bucketsMap.values());
+
+  // sort: known spouses first, then unknown; then by spouse name
+  buckets.sort((a, b) => {
     if (!a.spouse && b.spouse) return 1;
     if (a.spouse && !b.spouse) return -1;
+    const an = a.spouse?.fullName ?? "~";
+    const bn = b.spouse?.fullName ?? "~";
     return an.localeCompare(bn);
   });
 
-  return result;
+  return buckets;
 }
 
+/* ---------- Route ---------- */
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
-    const person = await prisma.person.findUnique({
+    const personRaw = await prisma.person.findUnique({
       where: { id: params.id },
       select: { id: true, givenName: true, familyName: true, gender: true },
     });
-    if (!person) {
+    if (!personRaw) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    const person = nice(personRaw)!;
 
+    // Parallelize major fetches
     const [parents, grandparents, spouses, spouseBuckets] = await Promise.all([
       getParents(person.id),
       getGrandparents(person.id),
-      getSpouses(person.id),
+      getSpouses(person.id),             // ✅ now returns PersonLite[]
       getChildrenGroupedBySpouse(person.id),
     ]);
 
-    const isMale = (g?: string | null) =>
-      (g ?? "").toLowerCase().startsWith("m");
-
+    // Up navigation: prefer father, else first parent
     const father = parents.find((p) => isMale(p?.gender)) ?? parents[0] ?? null;
 
-    const firstSon = await prisma.parentChild.findFirst({
-      where: {
-        parentId: person.id,
-        child: { gender: { startsWith: "m", mode: "insensitive" } },
-      },
-      select: {
-        child: {
-          select: { id: true, givenName: true, familyName: true, gender: true },
-        },
-      },
-      orderBy: { id: "asc" },
-    });
-
-    const anyChild = await prisma.parentChild.findFirst({
-      where: { parentId: person.id },
-      select: {
-        child: { select: { id: true, givenName: true, familyName: true, gender: true } },
-      },
-      orderBy: { id: "asc" },
-    });
-
-    const downTarget = firstSon?.child ?? anyChild?.child ?? null;
+    // Down navigation: prefer first male child, else any child
+    const allChildren: PersonLite[] = spouseBuckets.flatMap((b) => b.children.map((c) => c.person));
+    const firstSon = allChildren.find((c) => isMale(c.gender));
+    const anyChild = allChildren[0] ?? null;
+    const downTarget = firstSon ?? anyChild ?? null;
 
     return NextResponse.json({
-      focus: nice(person),
+      focus: person,
       parents,
       grandparents,
-      spouses,
-      spouseBuckets,
+      spouses,         // ✅ flat list of PersonLite (names included)
+      spouseBuckets,   // unchanged
       nav: {
-        up: father
-          ? { id: father.id, name: father.fullName ?? "" }
-          : null,
-        down: downTarget
-          ? {
-              id: downTarget.id,
-              name:
-                [downTarget.givenName ?? "", downTarget.familyName ?? ""]
-                  .join(" ")
-                  .trim() || "(unknown)",
-            }
-          : null,
+        up: father ? { id: father.id, name: father.fullName } : null,
+        down: downTarget ? { id: downTarget.id, name: downTarget.fullName } : null,
       },
     });
   } catch (e: any) {

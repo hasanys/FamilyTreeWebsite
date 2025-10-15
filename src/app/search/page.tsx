@@ -62,7 +62,7 @@ export default function SearchPage() {
             </div>
 
             <a
-              href={`/tree?focus=${p.id}`}
+              href={`/tree?id=${p.id}`}
               className="text-sm text-blue-700 hover:underline mt-2 sm:mt-0"
             >
               View tree
