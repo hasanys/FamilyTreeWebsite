@@ -1,12 +1,20 @@
 // src/app/api/explore/anomalies/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    if (!requireAuth()) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
     const rows = await prisma.$queryRaw<Array<{ kind: string; c: number }>>`
       SELECT 'dod_before_dob' AS kind, COUNT(*)::int AS c
       FROM "Person" WHERE dob IS NOT NULL AND dod IS NOT NULL AND dod < dob

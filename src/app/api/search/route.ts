@@ -1,9 +1,19 @@
 export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { requireAuth } from "@/lib/auth";
+
 const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
+
+  if (!requireAuth()) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+  
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
   if (!q) return NextResponse.json([]);

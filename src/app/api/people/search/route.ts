@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 /**
  * GET /api/people/search?q=...
@@ -11,6 +12,13 @@ export async function GET(req: Request) {
   const q = (searchParams.get("q") ?? "").trim();
 
   try {
+    if (!requireAuth()) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
     if (!q) {
       const rows = await prisma.$queryRawUnsafe<
         {

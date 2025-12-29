@@ -4,6 +4,7 @@ export const revalidate = 30; // short cache; adjust if needed
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 /* ---------- Types ---------- */
 type BasePerson = {
@@ -187,6 +188,14 @@ async function getChildrenGroupedBySpouse(personId: string) {
 /* ---------- Route ---------- */
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
+
+    if (!requireAuth()) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
     const personRaw = await prisma.person.findUnique({
       where: { id: params.id },
       select: { id: true, givenName: true, familyName: true, gender: true },

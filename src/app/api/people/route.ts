@@ -2,9 +2,17 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   try {
+    if (!requireAuth()) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
     // Use raw SQL so we exactly match quoted names in Postgres
     const rows: Array<{ 
       id: string; 

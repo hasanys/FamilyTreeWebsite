@@ -1,12 +1,20 @@
 // src/app/api/explore/basic/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    if (!requireAuth()) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
     const [row] = await prisma.$queryRaw<Array<{
       total_people: number; alive_count: number; with_dob: number; with_dod: number; total_marriages: number;
     }>>`

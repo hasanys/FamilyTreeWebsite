@@ -3,9 +3,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   try {
+    if (!requireAuth()) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+        
     const marriages = await prisma.marriage.findMany({
       select: { 
         id: true, 

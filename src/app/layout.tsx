@@ -3,17 +3,28 @@ import "./globals.css";
 import Link from "next/link";
 import { Libre_Baskerville } from "next/font/google";
 import HeaderNav from "@/components/HeaderNav";
-import AuthGate from "@/components/AuthGate"; // ✅ add this line
+import AuthGate from "@/components/AuthGate";
+import Footer from "@/components/Footer";
 
-const headerSerif = Libre_Baskerville({ weight: ["700"], subsets: ["latin"] });
+const headerSerif = Libre_Baskerville({
+  weight: ["700"],
+  subsets: ["latin"],
+});
 
-export const metadata = { title: "Family Tree", description: "Our Family Tree" };
+export const metadata = {
+  title: "Family Tree",
+  description: "Our Family Tree",
+};
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body className="text-stone-800">
-        {/* ✅ Password gate renders a modal over everything when locked */}
+      <body className="min-h-screen flex flex-col text-stone-800">
+        {/* Password gate renders a modal over everything when locked */}
         <AuthGate />
 
         <header className="sticky top-0 z-50 bg-[var(--bg)]/90 backdrop-blur border-b border-stone-300/60">
@@ -28,11 +39,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </nav>
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-10">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-10 flex-1">
+          {children}
+        </main>
 
-        <footer className="mt-16 border-t border-stone-300/60 py-6 text-center text-xs text-stone-600">
-          © {new Date().getFullYear()} Our Family
-        </footer>
+        <Footer />
       </body>
     </html>
   );

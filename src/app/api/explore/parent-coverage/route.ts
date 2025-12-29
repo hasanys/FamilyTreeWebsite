@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    if (!requireAuth()) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
     // Single query, no transaction. Uses subselect—fast with indexes on ParentChild(childId).
     const rows = await prisma.$queryRaw<Array<{ bucket: string; c: number }>>`
       WITH counts AS (
