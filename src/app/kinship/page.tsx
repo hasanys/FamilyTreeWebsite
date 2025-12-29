@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import RelationExplainer from "@/components/RelationExplainer";
 
 type PersonRow = {
   id: string;
@@ -40,6 +41,8 @@ export default function KinshipPage() {
   const [b, setB] = useState<PersonRow | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ relation: string; direction?: string } | null>(null);
+  const [computedA, setComputedA] = useState<PersonRow | null>(null);
+  const [computedB, setComputedB] = useState<PersonRow | null>(null);
 
   const canCompute = a && b && a.id !== b.id;
 
@@ -52,9 +55,13 @@ export default function KinshipPage() {
       const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
       setResult(data);
+      setComputedA(a);
+      setComputedB(b);
     } catch (e) {
       console.error(e);
       setResult({ relation: "Error computing relationship" });
+      setComputedA(a);
+      setComputedB(b);
     } finally {
       setLoading(false);
     }
@@ -62,7 +69,15 @@ export default function KinshipPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="font-serif text-4xl mb-6">Kinship Finder</h1>
+      <h1 className="font-serif text-4xl mb-3">Kinship Finder</h1>
+      
+      <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm text-gray-700">
+          <strong>⚠️ Note:</strong> The relation finder may not be completely accurate. 
+          Use this data at your own discretion. This feature is still a work in progress and 
+          results should be verified independently.
+        </p>
+      </div>
 
       <div className="grid sm:grid-cols-2 gap-6 mb-4">
         <PersonPicker label="From person" value={a} onPick={setA} />
@@ -93,14 +108,42 @@ export default function KinshipPage() {
 
         {!result && <div className="text-gray-500">Pick two people and click Compute.</div>}
 
-        {result && a && b && (
-          <div className="space-y-2">
-            {/* Relation summary label */}
-            <div className="text-lg font-semibold">{result.relation}</div>
+        {result && computedA && computedB && (
+          <div className="space-y-4">
+            {/* Relation summary label with explanation */}
+            <div>
+              <div className="text-lg font-semibold mb-1">{result.relation}</div>
+              <RelationExplainer 
+                relation={result.relation}
+                person1Name={fullName(computedA) || "Person 1"}
+                person2Name={fullName(computedB) || "Person 2"}
+              />
+            </div>
 
             {/* Human-readable sentence */}
             <div className="text-lg text-gray-800">
-              <RelationSentence a={a} b={b} result={result} />
+              <RelationSentence a={computedA} b={computedB} result={result} />
+            </div>
+
+            {/* Link to tree view */}
+            <div className="pt-3 border-t border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">
+                View details on this relation by exploring the tree view:
+              </p>
+              <div className="flex gap-3">
+                <Link
+                  href={`/tree?id=${computedA.id}`}
+                  className="text-blue-700 hover:underline text-sm"
+                >
+                  View {fullName(computedA) || "(Person A)"}'s tree →
+                </Link>
+                <Link
+                  href={`/tree?id=${computedB.id}`}
+                  className="text-blue-700 hover:underline text-sm"
+                >
+                  View {fullName(computedB) || "(Person B)"}'s tree →
+                </Link>
+              </div>
             </div>
           </div>
         )}
@@ -194,7 +237,7 @@ function PersonPicker({
         onFocus={() => setOpen(true)}
       />
       {open && opts.length > 0 && (
-        <div className="absolute z-20 mt-2 w-full rounded-xl border bg-white shadow">
+        <div className="absolute z-20 mt-2 w-full rounded-xl border bg-white shadow max-h-80 overflow-y-auto">
           {opts.map((p) => {
             const name = fullName(p) || "(No name)";
             return (

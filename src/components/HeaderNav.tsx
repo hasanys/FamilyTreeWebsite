@@ -55,7 +55,6 @@ export default function HeaderNav() {
     { href: "/kinship", label: "Relations" },
     { href: "/tree", label: "Browse Tree" },
     { href: "/contact", label: "Contact" },
-    { href: "/admin", label: "Admin" },
   ];
 
   async function handleLogout() {

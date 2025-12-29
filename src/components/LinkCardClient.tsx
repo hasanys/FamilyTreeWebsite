@@ -45,9 +45,9 @@ export default function LinkCardClient({
     const date = datePath ? getByPath(data, datePath) : undefined;
     if (id != null) {
       content = (
-        <Link className="text-blue-700 hover:underline" href={`/person/${id}`}>
-          {date ? `${String(date).slice(0, 10)} — ` : ""}
-          {fullName(given, family)}
+        <Link className="text-blue-700 hover:underline flex flex-col" href={`/person/${id}`}>
+          {date && <span className="text-sm text-gray-600">{String(date).slice(0, 10)}</span>}
+          <span>{fullName(given, family)}</span>
         </Link>
       );
     }

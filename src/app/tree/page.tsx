@@ -43,7 +43,18 @@ function TreePageInner() {
       {!loading && error && (
         <div className="text-red-600">Error loading tree: {error}</div>
       )}
-      {!loading && data && <TreeBoxes data={data} />}
+      {!loading && data && (
+        <>
+          {/* Navigation instructions - only show when tree is loaded */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <p className="text-sm text-gray-700">
+              <strong>💡 Tip:</strong> Click on any family member in the tree view to navigate to their specific family tree. 
+              This allows you to move up or down generations and explore different branches of the family.
+            </p>
+          </div>
+          <TreeBoxes data={data} />
+        </>
+      )}
     </main>
   );
 }

@@ -245,17 +245,6 @@ export default function TreeBoxes({ data }: { data: Data }) {
 
   return (
     <div className="grid gap-10">
-      <div className="flex justify-center">
-        <a
-          className={clsx(
-            "rounded-2xl border border-gray-200 bg-white px-4 py-2 font-semibold shadow-sm",
-            !nav.up && "pointer-events-none opacity-40"
-          )}
-          href={nav.up ? `/tree?id=${nav.up.id}` : "#"}
-        >
-          ↑ Up one generation
-        </a>
-      </div>
 
       <div id="tree-canvas-tw" className="relative">
         <svg className="pointer-events-none absolute inset-0 -z-10" width="100%" height="100%">
@@ -416,18 +405,6 @@ export default function TreeBoxes({ data }: { data: Data }) {
             );
           })}
         </Row>
-      </div>
-
-      <div className="flex justify-center">
-        <a
-          className={clsx(
-            "rounded-2xl border border-gray-200 bg-white px-4 py-2 font-semibold shadow-sm",
-            !nav.down && "pointer-events-none opacity-40"
-          )}
-          href={nav.down ? `/tree?id=${nav.down.id}` : "#"}
-        >
-          ↓ Down one generation
-        </a>
       </div>
     </div>
   );

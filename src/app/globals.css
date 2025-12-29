@@ -34,7 +34,7 @@ body {
 
 /* Blur every direct child of <body> EXCEPT the auth modal */
 html.app-locked body > :not(.auth-modal-root) {
-  filter: blur(9px);
+  filter: blur(8px) brightness(0.8);
   pointer-events: none;
   user-select: none;
 }
